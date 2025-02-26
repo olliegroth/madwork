@@ -1,9 +1,11 @@
 package com.example.madwork
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -35,8 +37,11 @@ class MainActivity : ComponentActivity(), LocationListener {
         setContent {
             var latitudeInput by remember { mutableStateOf("") }
             var longitudeInput by remember { mutableStateOf("") }
-            var inputCoordinates by remember { mutableStateOf<LatLng?>(null) }
-            val coordinates = latLngViewModel.latLng.let { LatLng(it.latitude, it.longitude) }
+            var coordinates by remember { mutableStateOf<LatLng?>(null) }
+
+            latLngViewModel.latLngLiveData.observe(this) {
+                coordinates = it
+            }
 
             Column(
                 modifier = Modifier
@@ -64,10 +69,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = {
                         if (latitudeInput.isNotEmpty() && longitudeInput.isNotEmpty()) {
-                            inputCoordinates = LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
+                            coordinates = LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
                             val location = Location("manual").apply {
-                                latitude = inputCoordinates!!.latitude
-                                longitude = inputCoordinates!!.longitude
+                                latitude = coordinates!!.latitude
+                                longitude = coordinates!!.longitude
                             }
                             latLngViewModel.updateLocation(location)
                         }
@@ -80,11 +85,11 @@ class MainActivity : ComponentActivity(), LocationListener {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Longitude: ${latLngViewModel.latLng.longitude}")
                 Spacer(modifier = Modifier.height(16.dp))
-                val finalCoordinates = inputCoordinates ?: coordinates
+
                 MapLibre(
                     modifier = Modifier.fillMaxSize(),
                     styleBuilder = org.maplibre.android.maps.Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright"),
-                    cameraPosition = CameraPosition(finalCoordinates, 14.0)
+                    cameraPosition = CameraPosition(coordinates, 14.0)
                 )
             }
         }
@@ -94,12 +99,12 @@ class MainActivity : ComponentActivity(), LocationListener {
         val requiredPermission = Manifest.permission.ACCESS_FINE_LOCATION
 
         if (checkSelfPermission(requiredPermission) == PackageManager.PERMISSION_GRANTED) {
-            latLngViewModel.startGPS()
+            startGPS()
         } else {
             val permissionLauncher =
                 this.registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
                     if (isGranted) {
-                        latLngViewModel.startGPS()
+                        startGPS()
                     } else {
                         Toast.makeText(this, "GPS permission not granted", Toast.LENGTH_LONG).show()
                     }
@@ -111,6 +116,12 @@ class MainActivity : ComponentActivity(), LocationListener {
     override fun onLocationChanged(location: Location) {
         latLngViewModel.updateLocation(location)
     }
+
+    @SuppressLint("MissingPermission")
+    fun startGPS() {
+        val mgr = getSystemService(LOCATION_SERVICE) as LocationManager
+        mgr.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, this )
+    }
 }
 
 class LatLngViewModel: ViewModel() {
@@ -119,11 +130,7 @@ class LatLngViewModel: ViewModel() {
             field = newValue
             latLngLiveData.value = newValue
         }
-    private var latLngLiveData = MutableLiveData<LatLng>()
-
-    fun startGPS() {
-        // Start GPS
-    }
+    var latLngLiveData = MutableLiveData<LatLng>()
 
     fun updateLocation(location: Location) {
         latLng = LatLng(location.latitude, location.longitude)
