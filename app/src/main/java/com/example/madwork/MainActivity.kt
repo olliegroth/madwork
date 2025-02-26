@@ -13,8 +13,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
@@ -35,6 +37,9 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         setContent {
             val location by locationViewModel.location.observeAsState()
+            var latitudeInput by remember { mutableStateOf("") }
+            var longitudeInput by remember { mutableStateOf("") }
+            var inputCoordinates by remember { mutableStateOf<org.maplibre.android.geometry.LatLng?>(null) }
             val coordinates = location?.let { org.maplibre.android.geometry.LatLng(it.latitude, it.longitude) }
 
             Column(
@@ -43,11 +48,39 @@ class MainActivity : ComponentActivity(), LocationListener {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextField(
+                        value = latitudeInput,
+                        onValueChange = { latitudeInput = it },
+                        label = { Text("Latitude") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextField(
+                        value = longitudeInput,
+                        onValueChange = { longitudeInput = it },
+                        label = { Text("Longitude") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        if (latitudeInput.isNotEmpty() && longitudeInput.isNotEmpty()) {
+                            inputCoordinates = org.maplibre.android.geometry.LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
+                        }
+                    }) {
+                        Text("Go!")
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "Latitude: ${location?.latitude ?: "Loading..."}")
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Longitude: ${location?.longitude ?: "Loading..."}")
                 Spacer(modifier = Modifier.height(16.dp))
-                coordinates?.let {
+                val finalCoordinates = inputCoordinates ?: coordinates
+                finalCoordinates?.let {
                     MapLibre(
                         modifier = Modifier.fillMaxSize(),
                         styleBuilder = org.maplibre.android.maps.Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright"),
