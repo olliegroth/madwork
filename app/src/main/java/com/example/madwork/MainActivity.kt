@@ -1,11 +1,9 @@
 package com.example.madwork
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
-import android.location.LocationManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,17 +16,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import org.maplibre.android.geometry.LatLng
 import org.ramani.compose.CameraPosition
 import org.ramani.compose.MapLibre
 
 class MainActivity : ComponentActivity(), LocationListener {
-    private val locationViewModel: LocationViewModel by viewModels()
+    private val latLngViewModel: LatLngViewModel by viewModels()
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,11 +33,10 @@ class MainActivity : ComponentActivity(), LocationListener {
         checkPermissions()
 
         setContent {
-            val location by locationViewModel.location.observeAsState()
             var latitudeInput by remember { mutableStateOf("") }
             var longitudeInput by remember { mutableStateOf("") }
-            var inputCoordinates by remember { mutableStateOf<org.maplibre.android.geometry.LatLng?>(null) }
-            val coordinates = location?.let { org.maplibre.android.geometry.LatLng(it.latitude, it.longitude) }
+            var inputCoordinates by remember { mutableStateOf<LatLng?>(null) }
+            val coordinates = latLngViewModel.latLng.let { LatLng(it.latitude, it.longitude) }
 
             Column(
                 modifier = Modifier
@@ -68,16 +64,17 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = {
                         if (latitudeInput.isNotEmpty() && longitudeInput.isNotEmpty()) {
-                            inputCoordinates = org.maplibre.android.geometry.LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
+                            inputCoordinates = LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
+                            latLngViewModel.latLng = Location(inputCoordinates.latitude, inputCoordinates.longitude)
                         }
                     }) {
                         Text("Go!")
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Latitude: ${location?.latitude ?: "Loading..."}")
+                Text(text = "Latitude: ${latLngViewModel.latLng.latitude ?: "Loading..."}")
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Longitude: ${location?.longitude ?: "Loading..."}")
+                Text(text = "Longitude: ${latLngViewModel.latLng.longitude ?: "Loading..."}")
                 Spacer(modifier = Modifier.height(16.dp))
                 val finalCoordinates = inputCoordinates ?: coordinates
                 finalCoordinates?.let {
@@ -95,12 +92,12 @@ class MainActivity : ComponentActivity(), LocationListener {
         val requiredPermission = Manifest.permission.ACCESS_FINE_LOCATION
 
         if (checkSelfPermission(requiredPermission) == PackageManager.PERMISSION_GRANTED) {
-            locationViewModel.startGPS()
+            latLngViewModel.startGPS()
         } else {
             val permissionLauncher =
                 this.registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
                     if (isGranted) {
-                        locationViewModel.startGPS()
+                        latLngViewModel.startGPS()
                     } else {
                         Toast.makeText(this, "GPS permission not granted", Toast.LENGTH_LONG).show()
                     }
@@ -110,32 +107,23 @@ class MainActivity : ComponentActivity(), LocationListener {
     }
 
     override fun onLocationChanged(location: Location) {
-        locationViewModel.updateLocation(location)
+        latLngViewModel.updateLocation(location)
     }
-
-    override fun onProviderEnabled(provider: String) {}
-    override fun onProviderDisabled(provider: String) {}
 }
 
-class LocationViewModel(application: android.app.Application) : AndroidViewModel(application), LocationListener {
-    private val _location = MutableLiveData<Location>()
-    val location: LiveData<Location> = _location
+class LatLngViewModel: ViewModel() {
+    var latLng = LatLng(51.05, -0.72)
+        set(newValue) {
+            field = newValue
+            latLngLiveData.value = newValue
+        }
+    var latLngLiveData = MutableLiveData<LatLng>()
 
-    private val locationManager = application.getSystemService(android.app.Application.LOCATION_SERVICE) as LocationManager
-
-    @SuppressLint("MissingPermission")
     fun startGPS() {
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, this)
+        // Start GPS
     }
 
     fun updateLocation(location: Location) {
-        _location.value = location
+        latLng = LatLng(location.latitude, location.longitude)
     }
-
-    override fun onLocationChanged(location: Location) {
-        _location.value = location
-    }
-
-    override fun onProviderEnabled(provider: String) {}
-    override fun onProviderDisabled(provider: String) {}
 }
