@@ -65,25 +65,27 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Button(onClick = {
                         if (latitudeInput.isNotEmpty() && longitudeInput.isNotEmpty()) {
                             inputCoordinates = LatLng(latitudeInput.toDouble(), longitudeInput.toDouble())
-                            latLngViewModel.latLng = Location(inputCoordinates.latitude, inputCoordinates.longitude)
+                            val location = Location("manual").apply {
+                                latitude = inputCoordinates!!.latitude
+                                longitude = inputCoordinates!!.longitude
+                            }
+                            latLngViewModel.updateLocation(location)
                         }
                     }) {
                         Text("Go!")
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Latitude: ${latLngViewModel.latLng.latitude ?: "Loading..."}")
+                Text(text = "Latitude: ${latLngViewModel.latLng.latitude}")
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Longitude: ${latLngViewModel.latLng.longitude ?: "Loading..."}")
+                Text(text = "Longitude: ${latLngViewModel.latLng.longitude}")
                 Spacer(modifier = Modifier.height(16.dp))
                 val finalCoordinates = inputCoordinates ?: coordinates
-                finalCoordinates?.let {
-                    MapLibre(
-                        modifier = Modifier.fillMaxSize(),
-                        styleBuilder = org.maplibre.android.maps.Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright"),
-                        cameraPosition = CameraPosition(it, 14.0)
-                    )
-                }
+                MapLibre(
+                    modifier = Modifier.fillMaxSize(),
+                    styleBuilder = org.maplibre.android.maps.Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright"),
+                    cameraPosition = CameraPosition(finalCoordinates, 14.0)
+                )
             }
         }
     }
@@ -117,7 +119,7 @@ class LatLngViewModel: ViewModel() {
             field = newValue
             latLngLiveData.value = newValue
         }
-    var latLngLiveData = MutableLiveData<LatLng>()
+    private var latLngLiveData = MutableLiveData<LatLng>()
 
     fun startGPS() {
         // Start GPS
